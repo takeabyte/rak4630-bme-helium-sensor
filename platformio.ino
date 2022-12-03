@@ -19,6 +19,7 @@ lib_deps =
 	adafruit/Adafruit Unified Sensor
 	olikraus/U8g2@^2.34.5
 	adafruit/Adafruit BME680 Library@^2.0.2
+	closedcube/ClosedCube OPT3001@^1.1.2
 build_flags = 
 	
 	-DRAK4631=1
