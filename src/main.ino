@@ -1,7 +1,11 @@
-
 //  Based on https://github.com/RAKWireless/WisBlock/blob/master/examples/RAK4630/communications/LoRa/LoRaWAN/LoRaWAN_OTAA_ABP/LoRaWAN_OTAA_ABP.ino
+// adn https://github.com/RAKWireless/WisBlock/blob/master/examples/RAK4630/solutions/Weather_Monitoring/Weather_Monitoring.ino
 //  Note: This program needs SX126x-Arduino Library version 2.0.0 or later. In platformio.ini, set...
 //    lib_deps = beegee-tokyo/SX126x-Arduino@^2.0.0
+//
+// RAK4631 Base with BME Environmental Sensor (RAK1906) and Light sensor (RAK1903) 
+//reporting to Helium Console at a given timeframe - in this example uploads every 15 min
+//
 /**
  * @file LoRaWAN_OTAA_ABP.ino
  * @author rakwireless.com
@@ -26,11 +30,15 @@
 #include <Arduino.h>
 #include <LoRaWan-RAK4630.h> //http://librarymanager/All#SX126x
 #include <SPI.h>
-
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME680.h> // Click to install library: http://librarymanager/All#Adafruit_BME680
 #include <U8g2lib.h>	// Click to install library: http://librarymanager/ALL#u8g2
+#include <ClosedCube_OPT3001.h> // Click here to get the library: http://librarymanager/All#OPT3001
+
+#define OPT3001_ADDRESS 0x44
+
+ClosedCube_OPT3001 opt3001;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0);
 Adafruit_BME680 bme;
@@ -172,6 +180,61 @@ uint8_t mvToLoRaWanBattVal(float mvolts)
     return (10 + (mvolts * 0.15F)) * 2.55;
 }
 
+void configureSensor()
+{
+  OPT3001_Config newConfig;
+
+  newConfig.RangeNumber = B1100;
+  newConfig.ConvertionTime = B0;
+  newConfig.Latch = B1;
+  newConfig.ModeOfConversionOperation = B11;
+
+  OPT3001_ErrorCode errorConfig = opt3001.writeConfig(newConfig);
+  if (errorConfig != NO_ERROR)
+  {
+  } //printError("OPT3001 configuration", errorConfig);
+  else
+  {
+    OPT3001_Config sensorConfig = opt3001.readConfig();
+    Serial.println("OPT3001 Current Config:");
+    Serial.println("------------------------------");
+
+    Serial.print("Conversion ready (R):");
+    Serial.println(sensorConfig.ConversionReady, HEX);
+
+    Serial.print("Conversion time (R/W):");
+    Serial.println(sensorConfig.ConvertionTime, HEX);
+
+    Serial.print("Fault count field (R/W):");
+    Serial.println(sensorConfig.FaultCount, HEX);
+
+    Serial.print("Flag high field (R-only):");
+    Serial.println(sensorConfig.FlagHigh, HEX);
+
+    Serial.print("Flag low field (R-only):");
+    Serial.println(sensorConfig.FlagLow, HEX);
+
+    Serial.print("Latch field (R/W):");
+    Serial.println(sensorConfig.Latch, HEX);
+
+    Serial.print("Mask exponent field (R/W):");
+    Serial.println(sensorConfig.MaskExponent, HEX);
+
+    Serial.print("Mode of conversion operation (R/W):");
+    Serial.println(sensorConfig.ModeOfConversionOperation, HEX);
+
+    Serial.print("Polarity field (R/W):");
+    Serial.println(sensorConfig.Polarity, HEX);
+
+    Serial.print("Overflow flag (R-only):");
+    Serial.println(sensorConfig.OverflowFlag, HEX);
+
+    Serial.print("Range number (R/W):");
+    Serial.println(sensorConfig.RangeNumber, HEX);
+
+    Serial.println("------------------------------");
+  }
+}
 
 void current_vbat(){
    // Get a raw ADC reading
@@ -279,7 +342,16 @@ void setup()
       break;
   }
   Serial.println("=====================================");
-  
+
+  /* opt3001 init */
+  opt3001.begin(OPT3001_ADDRESS);
+  Serial.print("OPT3001 Manufacturer ID");
+  Serial.println(opt3001.readManufacturerID());
+  Serial.print("OPT3001 Device ID");
+  Serial.println(opt3001.readDeviceID());
+
+  configureSensor();
+
   //creat a user timer to send data to server period
   uint32_t err_code;
   err_code = timers_init();
@@ -397,7 +469,6 @@ void lorawan_confirm_class_handler(DeviceClass_t Class)
   lmh_send(&m_lora_app_data, g_CurrentConfirm);
 }
 
-
 // This is called when the timer expires. We send a LoRaWAN Packet.
 void send_lora_frame(void)
 {
@@ -487,8 +558,9 @@ void bme680_get()
   double temp = bme.temperature;
   double pres = bme.pressure / 100.0;
   double hum = bme.humidity;
+  OPT3001 result = opt3001.readResult();
   uint32_t gas = bme.gas_resistance; //show in kOhms -> better quality, higher resistance
-  data = "Tem:" + String(temp) + "C " + "Hum:" + String(hum) + "% " + "Pres:" + String(pres) + "KPa " + "Gas:" + String(gas) + "Ohms";
+  data = "Tem:" + String(temp) + "C " + "Hum:" + String(hum) + "% " + "Pres:" + String(pres) + "KPa " + "Gas:" + String(gas) + "Ohms" + String(result.lux) + "lux";
   Serial.println(data);
   // display bme680 sensor data on OLED
   u8g2.clearBuffer();					// clear the internal memory
@@ -515,6 +587,7 @@ void bme680_get()
   uint16_t t = temp * 100;
   uint16_t h = hum * 100;
   uint32_t pre = pres * 100;
+  uint16_t l = result.lux * 100;
 
   Serial.println("==========Battery ================");
   float vbat_mv = readVBAT();
@@ -528,8 +601,6 @@ void bme680_get()
   Serial.println("");
   Serial.println("======================================");
   
-
-
   //result: T=28.25C, RH=50.00%, P=958.57hPa, G=100406 Ohms
   m_lora_app_data.buffer[i++] = 0x01;
   m_lora_app_data.buffer[i++] = (uint8_t)(t >> 8);
@@ -545,7 +616,7 @@ void bme680_get()
   m_lora_app_data.buffer[i++] = (uint8_t)((gas & 0x0000FF00) >> 8);
   m_lora_app_data.buffer[i++] = (uint8_t)(gas & 0x000000FF);
   m_lora_app_data.buffer[i++] = (uint8_t)vbat_per;
+  m_lora_app_data.buffer[i++] = (uint8_t)(l >> 8);
+  m_lora_app_data.buffer[i++] = (uint8_t)l;
   m_lora_app_data.buffsize = i;
 }
-
-
