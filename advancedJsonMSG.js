@@ -4,7 +4,7 @@
 "humidity": {{humidity}},
 "pressure": {{pressure}},
 "gas": {{gas}},
-"light": 0,
+"light": {{light}},
 "battery": {{battery}},
 {{/payload}}{{/decoded}}
 "name": "{{name}}",
