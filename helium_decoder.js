@@ -5,8 +5,7 @@ function Decoder(bytes, port, uplink_info) {
     decoded.pressure = (bytes[8] | (bytes[7] << 8) | (bytes[6] << 16) | (bytes[5] << 24))/100;
     decoded.gas = ( bytes[12] | (bytes[11] << 8) | (bytes[10] << 16) | (bytes[9] << 24))/1000;
     decoded.battery = (bytes[13]);
-    decoded.light = (0);
-/* light value for now set to 0 until further expanding the code */
+    decoded.light = (bytes[14] << 8 | (bytes[15]))/100;
 /* someday ..
 
   The uplink_info variable is an OPTIONAL third parameter that provides the following:
